@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<psalm
+    errorLevel="1"
+    resolveFromConfigFile="true"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="https://getpsalm.org/schema/config"
+    xsi:schemaLocation="https://getpsalm.org/schema/config vendor/vimeo/psalm/config.xsd"
+    findUnusedBaselineEntry="true"
+    findUnusedCode="true"
+    runTaintAnalysis="true"
+>
+    <projectFiles>
+        <directory name="src"/>
+        <directory name="tests"/>
+        <ignoreFiles>
+            <directory name="vendor"/>
+        </ignoreFiles>
+    </projectFiles>
+
+    <issueHandlers>
+        <!-- Psalm's MissingThrowsDocblock is stricter than PHPStan -->
+        <!-- We already have PHPStan exception handling enabled -->
+        <MissingThrowsDocblock errorLevel="info"/>
+
+        <UnusedClass>
+            <errorLevel type="suppress">
+                <directory name="tests"/>
+            </errorLevel>
+        </UnusedClass>
+
+        <!-- PHPUnit type assertions are intentionally redundant for documentation -->
+        <RedundantCondition>
+            <errorLevel type="suppress">
+                <directory name="tests"/>
+            </errorLevel>
+        </RedundantCondition>
+
+        <!-- PHPUnit uses setUp() for property initialization -->
+        <PropertyNotSetInConstructor>
+            <errorLevel type="suppress">
+                <directory name="tests"/>
+            </errorLevel>
+        </PropertyNotSetInConstructor>
+
+        <!-- PHPUnit setUp() override is standard pattern -->
+        <MissingOverrideAttribute>
+            <errorLevel type="suppress">
+                <directory name="tests"/>
+            </errorLevel>
+        </MissingOverrideAttribute>
+    </issueHandlers>
+</psalm>

@@ -1,0 +1,94 @@
+deptrac:
+  paths:
+    - ./src
+
+  layers:
+    # ==========================================
+    # Exception Layer (no dependencies)
+    # ==========================================
+    - name: Exception
+      collectors:
+        - type: directory
+          value: src/Exception/
+
+    # ==========================================
+    # Encryption Layer
+    # ==========================================
+    - name: Encryption
+      collectors:
+        - type: directory
+          value: src/Encryption/
+
+    # ==========================================
+    # Core Layer (DTOs, Interfaces, Logger)
+    # ==========================================
+    - name: CoreDTO
+      collectors:
+        - type: classLike
+          value: ^Zappzarapp\\AuditLogger\\AuditLogEntry$
+        - type: classLike
+          value: ^Zappzarapp\\AuditLogger\\AuditLogResult$
+
+    - name: CoreInterface
+      collectors:
+        - type: classLike
+          value: ^Zappzarapp\\AuditLogger\\AuditLoggerInterface$
+
+    - name: FileLogReader
+      collectors:
+        - type: classLike
+          value: ^Zappzarapp\\AuditLogger\\FileLogReader$
+
+    - name: CoreLogger
+      collectors:
+        - type: classLike
+          value: ^Zappzarapp\\AuditLogger\\AuditLogger$
+
+    - name: CoreNullLogger
+      collectors:
+        - type: classLike
+          value: ^Zappzarapp\\AuditLogger\\NullAuditLogger$
+
+  ruleset:
+    # Exception layer has no internal dependencies
+    Exception: ~
+
+    # Encryption may only depend on Exception
+    Encryption:
+      - Exception
+
+    # DTOs have no dependencies
+    CoreDTO: ~
+
+    # Interface depends on DTOs and Exception
+    CoreInterface:
+      - CoreDTO
+      - Exception
+
+    # FileLogReader depends on Encryption, Exception, and CoreDTO
+    FileLogReader:
+      - Encryption
+      - Exception
+      - CoreDTO
+
+    # Logger depends on everything
+    CoreLogger:
+      - CoreInterface
+      - CoreDTO
+      - Encryption
+      - Exception
+      - FileLogReader
+
+    # NullLogger depends on Interface, DTOs, and Exception (transitively via Interface)
+    CoreNullLogger:
+      - CoreInterface
+      - CoreDTO
+      - Exception
+
+  skip_violations: {}
+
+  formatters:
+    graphviz:
+      hidden_layers: []
+      groups: {}
+      pointToGroups: false

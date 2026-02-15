@@ -1,0 +1,88 @@
+{
+  "name": "zappzarapp/audit-logger",
+  "description": "GDPR-compliant audit logging with injectable encryption, configurable storage, and tamper-proof checksums",
+  "type": "library",
+  "license": "MIT",
+  "keywords": [
+    "audit",
+    "audit-log",
+    "gdpr",
+    "logging",
+    "compliance",
+    "encryption",
+    "security",
+    "php8"
+  ],
+  "authors": [
+    {
+      "name": "Marc Straube",
+      "email": "email@marcstraube.de"
+    }
+  ],
+  "homepage": "https://github.com/marcstraube/zappzarapp-php-audit-logger",
+  "support": {
+    "issues": "https://github.com/marcstraube/zappzarapp-php-audit-logger/issues",
+    "source": "https://github.com/marcstraube/zappzarapp-php-audit-logger"
+  },
+  "require": {
+    "php": "^8.4",
+    "ext-pdo": "*"
+  },
+  "suggest": {
+    "ext-openssl": "For AppEncryption (AES-256-GCM application-level encryption)"
+  },
+  "require-dev": {
+    "captainhook/captainhook": "*",
+    "captainhook/plugin-composer": "^5.3",
+    "cyclonedx/cyclonedx-php-composer": "^6.1",
+    "deptrac/deptrac": "^4.5",
+    "ekino/phpstan-banned-code": "^3.0",
+    "friendsofphp/php-cs-fixer": "^3.91",
+    "infection/infection": "*",
+    "mikey179/vfsstream": "^1.6",
+    "phpmd/phpmd": "^2.15",
+    "phpstan/phpstan": "^2.1",
+    "phpunit/phpunit": "^13.0",
+    "rector/rector": "^2.3",
+    "roave/security-advisories": "dev-latest",
+    "vimeo/psalm": "^6.14"
+  },
+  "config": {
+    "allow-plugins": {
+      "captainhook/plugin-composer": true,
+      "cyclonedx/cyclonedx-php-composer": true,
+      "infection/extension-installer": true
+    },
+    "platform": {
+      "php": "8.4.3"
+    }
+  },
+  "autoload": {
+    "psr-4": {
+      "Zappzarapp\\AuditLogger\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Zappzarapp\\AuditLogger\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "@php vendor/bin/phpunit",
+    "analyse": "@php vendor/bin/phpstan analyse --memory-limit=512M",
+    "phpmd": "@php vendor/bin/phpmd src text phpmd.xml",
+    "rector": "@php vendor/bin/rector process --dry-run",
+    "rector-fix": "@php vendor/bin/rector process",
+    "deptrac": "@php vendor/bin/deptrac analyse",
+    "infection": "@php vendor/bin/infection --threads=4",
+    "sbom": "@composer CycloneDX:make-sbom --output-file=sbom.json",
+    "docs": "@php build/bin/phpDocumentor.phar",
+    "cs-fix": "@php vendor/bin/php-cs-fixer fix",
+    "cs-check": "@php vendor/bin/php-cs-fixer fix --dry-run --diff",
+    "psalm": "@php vendor/bin/psalm --show-info=false",
+    "psalm-taint": "@php vendor/bin/psalm --taint-analysis",
+    "security": "composer audit --no-dev",
+    "check": ["@security", "@cs-check", "@analyse", "@psalm", "@phpmd", "@rector", "@deptrac", "@test"],
+    "check-full": ["@check", "@infection", "@psalm-taint"]
+  }
+}

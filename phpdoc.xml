@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<phpdocumentor
+    configVersion="3"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="https://www.phpdoc.org"
+    xsi:noNamespaceSchemaLocation="https://docs.phpdoc.org/latest/phpdoc.xsd"
+>
+    <title>zappzarapp/audit-logger</title>
+    <paths>
+        <output>docs/api</output>
+        <cache>build/.phpdoc-cache</cache>
+    </paths>
+    <version number="latest">
+        <api>
+            <source dsn=".">
+                <path>src</path>
+            </source>
+            <output>api</output>
+            <ignore hidden="true" symlinks="true">
+                <path>vendor/**/*</path>
+                <path>tests/**/*</path>
+                <path>build/**/*</path>
+            </ignore>
+            <extensions>
+                <extension>php</extension>
+            </extensions>
+            <visibility>public</visibility>
+            <default-package-name>Zappzarapp\AuditLogger</default-package-name>
+        </api>
+    </version>
+    <template name="default"/>
+</phpdocumentor>

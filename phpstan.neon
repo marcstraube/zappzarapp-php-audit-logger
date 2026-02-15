@@ -1,0 +1,56 @@
+includes:
+    - vendor/ekino/phpstan-banned-code/extension.neon
+
+parameters:
+    level: 8
+    paths:
+        - src
+        - tests
+
+    # Security: Banned dangerous functions
+    banned_code:
+        non_ignorable: false
+        nodes:
+            -
+                type: Expr_Eval
+                functions: null
+            -
+                type: Expr_FuncCall
+                functions:
+                    - dd
+                    - debug_backtrace
+                    - dump
+                    - exec
+                    - passthru
+                    - phpinfo
+                    - print_r
+                    - proc_open
+                    - shell_exec
+                    - system
+                    - var_dump
+
+    # Performance
+    parallel:
+        jobSize: 20
+        maximumNumberOfProcesses: 4
+
+    reportUnmatchedIgnoredErrors: false
+
+    # Exception Handling
+    exceptions:
+        check:
+            missingCheckedExceptionInThrows: true
+            tooWideThrowType: true
+        implicitThrows: false
+
+    ignoreErrors:
+        -
+            message: '#will always evaluate to true#'
+            identifier: method.alreadyNarrowedType
+            path: tests/*
+        # Checked exceptions in tests: @throws annotations on test methods add no value.
+        # src/ is fully annotated; PHPStan enforces this via missingCheckedExceptionInThrows.
+        # Note: PhpStorm PHPStan scope is set to src/ only (path-based ignores don't work per-file).
+        -
+            identifier: missingType.checkedException
+            path: tests/*

@@ -1,0 +1,148 @@
+image: php:8.4-cli
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
+variables:
+  SAST_EXCLUDED_PATHS: "vendor/,build/,tests/"
+  XDEBUG_MODE: coverage
+
+stages:
+  - verify
+  - test
+  - security
+
+cache:
+  paths:
+    - vendor/
+
+verify-signatures:
+  stage: verify
+  image: alpine:3
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      if [ -n "$CI_MERGE_REQUEST_IID" ]; then
+        commits=$(curl -s --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/commits" \
+          | jq -r '.[].id')
+        unsigned=0
+        for sha in $commits; do
+          status=$(curl -s --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/commits/$sha/signature" \
+            | jq -r '.verification_status // "unsigned"')
+          if [ "$status" != "verified" ]; then
+            unsigned=$((unsigned + 1))
+            echo "Unsigned commit: ${sha:0:7}"
+          fi
+        done
+        if [ "$unsigned" -gt 0 ]; then
+          echo "ERROR: Found $unsigned unsigned commit(s) in MR. All commits must be GPG-signed."
+          exit 1
+        fi
+        echo "All MR commits are GPG-signed."
+      else
+        status=$(curl -s --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/commits/$CI_COMMIT_SHA/signature" \
+          | jq -r '.verification_status // "unsigned"')
+        if [ "$status" != "verified" ]; then
+          echo "ERROR: Commit $CI_COMMIT_SHA is not GPG-signed."
+          exit 1
+        fi
+        echo "Commit is GPG-signed."
+      fi
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+
+.php-setup: &php-setup
+  before_script:
+    - apt-get update -yqq
+    - apt-get install -yqq git unzip libzip-dev
+    - docker-php-ext-install zip
+    - pecl install pcov && docker-php-ext-enable pcov
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - composer install --prefer-dist --no-progress --no-interaction
+
+security:
+  <<: *php-setup
+  stage: test
+  script:
+    - composer audit --no-dev
+
+code-style:
+  <<: *php-setup
+  stage: test
+  script:
+    - vendor/bin/php-cs-fixer fix --dry-run --diff
+
+phpstan:
+  <<: *php-setup
+  stage: test
+  script:
+    - vendor/bin/phpstan analyse --memory-limit=512M
+
+psalm:
+  <<: *php-setup
+  stage: test
+  script:
+    - vendor/bin/psalm --show-info=false
+
+phpmd:
+  <<: *php-setup
+  stage: test
+  script:
+    - vendor/bin/phpmd src text phpmd.xml
+
+rector:
+  <<: *php-setup
+  stage: test
+  script:
+    - vendor/bin/rector process --dry-run
+
+phpunit:
+  <<: *php-setup
+  stage: test
+  script:
+    - vendor/bin/phpunit --coverage-text --colors=never --coverage-xml=build/coverage/coverage-xml --log-junit=build/coverage/junit.xml
+  coverage: '/^\s*Lines:\s*\d+.\d+\%/'
+  artifacts:
+    paths:
+      - build/coverage/
+    expire_in: 1 hour
+
+deptrac:
+  <<: *php-setup
+  stage: test
+  script:
+    - vendor/bin/deptrac analyse
+
+infection:
+  <<: *php-setup
+  stage: test
+  needs: [phpunit]
+  script:
+    - vendor/bin/infection --threads=4 --coverage=build/coverage --skip-initial-tests --min-msi=100 --min-covered-msi=100
+  artifacts:
+    paths:
+      - build/infection.log
+    expire_in: 1 week
+    when: always
+
+psalm-taint:
+  <<: *php-setup
+  stage: security
+  script:
+    - vendor/bin/psalm --taint-analysis
+
+sbom:
+  <<: *php-setup
+  stage: security
+  script:
+    - composer sbom
+  artifacts:
+    paths:
+      - sbom.json
+    expire_in: 1 week

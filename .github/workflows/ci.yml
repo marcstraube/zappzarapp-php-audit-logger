@@ -1,0 +1,143 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  security-analysis:
+    name: Security Analysis (Psalm Taint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: openssl, pdo
+          tools: composer:v2
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.json') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Run Psalm Taint Analysis
+        run: vendor/bin/psalm --taint-analysis
+
+  tests:
+    name: PHP ${{ matrix.php }} Tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.4', '8.5']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Verify GPG signatures
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            unsigned=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.number }}/commits \
+              --paginate --jq '[.[] | select(.commit.verification.verified != true)] | length')
+            if [ "$unsigned" -gt 0 ]; then
+              echo "::error::Found $unsigned unsigned commit(s) in PR. All commits must be GPG-signed."
+              gh api repos/${{ github.repository }}/pulls/${{ github.event.number }}/commits \
+                --paginate --jq '.[] | select(.commit.verification.verified != true) | "  \(.sha[0:7]) — \(.commit.message | split("\n")[0])"'
+              exit 1
+            fi
+            echo "All PR commits are GPG-signed."
+          else
+            verified=$(gh api repos/${{ github.repository }}/commits/${{ github.sha }} \
+              --jq '.commit.verification.verified')
+            if [ "$verified" != "true" ]; then
+              echo "::error::Commit ${{ github.sha }} is not GPG-signed."
+              exit 1
+            fi
+            echo "Commit is GPG-signed."
+          fi
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: openssl, pdo
+          coverage: pcov
+          tools: composer:v2
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.json') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Security audit
+        run: composer audit --no-dev
+
+      - name: Check code style
+        run: vendor/bin/php-cs-fixer fix --dry-run --diff
+
+      - name: Run PHPStan
+        run: vendor/bin/phpstan analyse --memory-limit=512M
+
+      - name: Run Psalm
+        if: matrix.php == '8.4'
+        run: vendor/bin/psalm --show-info=false
+
+      - name: Run PHPMD
+        run: vendor/bin/phpmd src text phpmd.xml
+
+      - name: Run Rector
+        run: vendor/bin/rector process --dry-run
+
+      - name: Run tests with coverage
+        run: vendor/bin/phpunit --coverage-text --coverage-clover=coverage.xml --coverage-xml=build/coverage/coverage-xml --log-junit=build/coverage/junit.xml
+
+      - name: Run Deptrac
+        run: vendor/bin/deptrac analyse
+
+      - name: Run Infection
+        run: vendor/bin/infection --threads=4 --coverage=build/coverage --skip-initial-tests --logger-github
+
+      - name: Generate SBOM
+        run: composer sbom
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: sbom-php${{ matrix.php }}
+          path: sbom.json
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false

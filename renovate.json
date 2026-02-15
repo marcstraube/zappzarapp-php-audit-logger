@@ -1,0 +1,46 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":separateMajorReleases",
+    "schedule:weekly"
+  ],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": "!/^0/",
+      "automerge": true
+    },
+    {
+      "groupName": "PHPUnit",
+      "matchPackageNames": ["phpunit/phpunit"]
+    },
+    {
+      "groupName": "Static Analysis",
+      "matchPackageNames": [
+        "phpstan/phpstan",
+        "vimeo/psalm",
+        "phpmd/phpmd",
+        "ekino/phpstan-banned-code"
+      ]
+    },
+    {
+      "groupName": "Code Quality",
+      "matchPackageNames": [
+        "friendsofphp/php-cs-fixer",
+        "rector/rector"
+      ]
+    },
+    {
+      "matchPackageNames": ["roave/security-advisories"],
+      "schedule": ["at any time"]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "automerge": false
+  },
+  "labels": ["dependencies"]
+}
