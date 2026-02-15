@@ -6,6 +6,7 @@
       "package-name": "zappzarapp/audit-logger",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
+      "bootstrap-sha": "5c21dc54111864a7d8738d60aef2ebe43c7c25de",
       "changelog-sections": [
         {
           "type": "feat",
