@@ -358,7 +358,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
 
         $logDir = dirname($this->logFilePath);
         /** @infection-ignore-all: Permission value and mkdir failure path untestable without filesystem mocking */
-        if (!is_dir($logDir) && (!mkdir($logDir, 0755, true) && !is_dir($logDir))) {
+        if (!is_dir($logDir) && (!mkdir($logDir, 0700, true) && !is_dir($logDir))) {
             throw new StorageException('Failed to create log directory: ' . $logDir);
         }
 
