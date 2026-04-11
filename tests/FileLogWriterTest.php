@@ -258,4 +258,74 @@ final class FileLogWriterTest extends TestCase
         $this->assertFileExists($this->tempLogFile);
         $this->assertSame(0600, fileperms($this->tempLogFile) & 0777);
     }
+
+    #[Test]
+    public function testWriteThrowsStorageExceptionWhenFileTooLarge(): void
+    {
+        // Create a file exceeding 10 MB
+        file_put_contents($this->tempLogFile, str_repeat('x', 10_485_761));
+
+        $writer = new FileLogWriter(
+            fileEncryption: new AppEncryption(),
+            encryptionKey: $this->encryptionKey,
+            logFilePath: $this->tempLogFile,
+        );
+
+        $entry = new AuditLogEntry(
+            action: 'test.action',
+            entityType: 'test',
+            entityId: 1,
+        );
+
+        $this->expectException(StorageException::class);
+        $this->expectExceptionMessage('File log exceeds maximum size of 10485760 bytes');
+
+        $writer->write('2026-02-14 12:00:00', $entry, 'checksum');
+    }
+
+    #[Test]
+    public function testWriteAcceptsFileAtExactMaxSize(): void
+    {
+        // Create a file at exactly 10 MB
+        file_put_contents($this->tempLogFile, str_repeat('x', 10_485_760));
+
+        $writer = new FileLogWriter(
+            fileEncryption: new AppEncryption(),
+            encryptionKey: $this->encryptionKey,
+            logFilePath: $this->tempLogFile,
+        );
+
+        $entry = new AuditLogEntry(
+            action: 'test.action',
+            entityType: 'test',
+            entityId: 1,
+        );
+
+        // Should not throw on size check — file is exactly at the limit
+        $writer->write('2026-02-14 12:00:00', $entry, 'checksum');
+
+        // File was written to (grew beyond 10 MB)
+        $this->assertGreaterThan(10_485_760, filesize($this->tempLogFile));
+    }
+
+    #[Test]
+    public function testWriteAllowsNewFileCreation(): void
+    {
+        $writer = new FileLogWriter(
+            fileEncryption: new AppEncryption(),
+            encryptionKey: $this->encryptionKey,
+            logFilePath: $this->tempLogFile,
+        );
+
+        $entry = new AuditLogEntry(
+            action: 'test.action',
+            entityType: 'test',
+            entityId: 1,
+        );
+
+        // File doesn't exist yet — should succeed
+        $this->assertFileDoesNotExist($this->tempLogFile);
+        $writer->write('2026-02-14 12:00:00', $entry, 'checksum');
+        $this->assertFileExists($this->tempLogFile);
+    }
 }
