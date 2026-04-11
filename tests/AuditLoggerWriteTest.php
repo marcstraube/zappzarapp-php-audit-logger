@@ -627,6 +627,45 @@ final class AuditLoggerWriteTest extends TestCase
     }
 
     /**
+     * Test that validateIdentifier accepts table names at exactly 64 characters (boundary).
+     */
+    #[Test]
+    public function testConstructorAcceptsTableNameAtMaxLength(): void
+    {
+        $pdo  = $this->createStub(PDO::class);
+        $name = str_repeat('a', 64);
+
+        $logger = new AuditLogger(
+            pdo: $pdo,
+            encryptionKey: $this->encryptionKey,
+            encryption: new DatabaseEncryption(),
+            tableName: $name,
+        );
+
+        $this->assertInstanceOf(AuditLogger::class, $logger);
+    }
+
+    /**
+     * Test that validateIdentifier rejects table names exceeding 64 characters.
+     */
+    #[Test]
+    public function testConstructorRejectsTableNameExceedingMaxLength(): void
+    {
+        $pdo  = $this->createStub(PDO::class);
+        $name = str_repeat('a', 65);
+
+        $this->expectException(StorageException::class);
+        $this->expectExceptionMessage('Table name exceeds maximum length of 64 characters: ' . $name);
+
+        new AuditLogger(
+            pdo: $pdo,
+            encryptionKey: $this->encryptionKey,
+            encryption: new DatabaseEncryption(),
+            tableName: $name,
+        );
+    }
+
+    /**
      * Test file log contains timestamp field (kills mutant #36: ArrayItemRemoval of timestamp).
      */
     #[Test]

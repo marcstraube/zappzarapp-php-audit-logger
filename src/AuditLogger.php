@@ -32,6 +32,8 @@ final readonly class AuditLogger implements AuditLoggerInterface
 
     private const string HMAC_HKDF_INFO = 'audit-logger-hmac';
 
+    private const string TIMESTAMP_FORMAT = 'Y-m-d H:i:s';
+
     private const int MAX_ENCODED_DATA_SIZE = 10_000;
 
     private bool $useDbEncryption;
@@ -71,7 +73,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
             throw new InvalidArgumentException('Max limit must be at least 1');
         }
 
-        $this->escapeIdentifier($tableName);
+        $this->validateIdentifier($tableName);
 
         $this->useDbEncryption  = $encryption instanceof DatabaseEncryption;
         $this->fileEncryption   = $this->useDbEncryption ? new AppEncryption() : $encryption;
@@ -87,7 +89,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
      */
     public function log(AuditLogEntry $entry): void
     {
-        $timestamp = (new DateTimeImmutable())->format('Y-m-d H:i:s');
+        $timestamp = (new DateTimeImmutable())->format(self::TIMESTAMP_FORMAT);
         $dataJson  = $this->encodeData($entry, $timestamp);
 
         if (strlen($dataJson) > self::MAX_ENCODED_DATA_SIZE) {
@@ -117,7 +119,12 @@ final readonly class AuditLogger implements AuditLoggerInterface
             throw new StorageException('Failed to write audit log to database: ' . $pdoException->getMessage(), 0, $pdoException);
         }
 
-        $this->writeToFile($timestamp, $entry, $checksum);
+        try {
+            $this->writeToFile($timestamp, $entry, $checksum);
+        } catch (AuditLogException) {
+            // Silently ignore file write failures after successful database write.
+            // The file log is a redundant fallback — the audit entry is already persisted.
+        }
     }
 
     /**
@@ -205,13 +212,14 @@ final readonly class AuditLogger implements AuditLoggerInterface
     public function verify(AuditLogResult $result): bool
     {
         try {
-            $dataJson = json_encode([
-                'meta' => [
-                    'user_agent' => $result->userAgent,
-                    'timestamp'  => $result->timestamp->format('Y-m-d H:i:s'),
-                ],
-                'data' => $result->data,
-            ], JSON_THROW_ON_ERROR);
+            $dataJson = json_encode(
+                $this->buildEnvelope(
+                    $result->userAgent,
+                    $result->timestamp->format(self::TIMESTAMP_FORMAT),
+                    $result->data,
+                ),
+                JSON_THROW_ON_ERROR,
+            );
         } catch (JsonException) {
             return false;
         }
@@ -219,7 +227,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
         $expected = hash_hmac(
             'sha256',
             $this->buildChecksumInput(
-                $result->timestamp->format('Y-m-d H:i:s'),
+                $result->timestamp->format(self::TIMESTAMP_FORMAT),
                 $result->userId,
                 $result->ipAddress,
                 $result->action,
@@ -242,18 +250,30 @@ final readonly class AuditLogger implements AuditLoggerInterface
     }
 
     /**
+     * @param array<string, mixed>|null $data
+     * @return array{meta: array{user_agent: string, timestamp: string}, data: array<string, mixed>|null}
+     */
+    private function buildEnvelope(string $userAgent, string $timestamp, ?array $data): array
+    {
+        return [
+            'meta' => [
+                'user_agent' => $userAgent,
+                'timestamp'  => $timestamp,
+            ],
+            'data' => $data,
+        ];
+    }
+
+    /**
      * @throws StorageException
      */
     private function encodeData(AuditLogEntry $entry, string $timestamp): string
     {
         try {
-            return json_encode([
-                'meta' => [
-                    'user_agent' => $entry->userAgent,
-                    'timestamp'  => $timestamp,
-                ],
-                'data' => $entry->data,
-            ], JSON_THROW_ON_ERROR);
+            return json_encode(
+                $this->buildEnvelope($entry->userAgent, $timestamp, $entry->data),
+                JSON_THROW_ON_ERROR,
+            );
         } catch (JsonException $jsonException) {
             throw new StorageException('Failed to encode audit data as JSON: ' . $jsonException->getMessage(), 0, $jsonException);
         }
@@ -305,7 +325,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
         string $dataJson,
         string $checksum,
     ): void {
-        $table = $this->escapeIdentifier($this->tableName);
+        $table = $this->validateIdentifier($this->tableName);
 
         if ($this->useDbEncryption) {
             $sql = "
@@ -353,7 +373,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
 
         $logDir = dirname($this->logFilePath);
         /** @infection-ignore-all: Permission value and mkdir failure path untestable without filesystem mocking */
-        if (!is_dir($logDir) && (!mkdir($logDir, 0755, true) && !is_dir($logDir))) {
+        if (!is_dir($logDir) && (!mkdir($logDir, 0700, true) && !is_dir($logDir))) {
             throw new StorageException('Failed to create log directory: ' . $logDir);
         }
 
@@ -407,7 +427,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
             throw new InvalidArgumentException('Limit must not exceed ' . $this->maxLimit);
         }
 
-        $table = $this->escapeIdentifier($this->tableName);
+        $table = $this->validateIdentifier($this->tableName);
 
         if ($this->useDbEncryption) {
             $sql = "
@@ -535,12 +555,16 @@ final readonly class AuditLogger implements AuditLoggerInterface
     }
 
     /**
-     * Escape a SQL identifier (table name) to prevent injection
+     * Validate a SQL identifier (table name) to prevent injection
      *
      * @throws StorageException
      */
-    private function escapeIdentifier(string $identifier): string
+    private function validateIdentifier(string $identifier): string
     {
+        if (strlen($identifier) > 64) {
+            throw new StorageException('Table name exceeds maximum length of 64 characters: ' . $identifier);
+        }
+
         if (preg_match('/^[a-zA-Z_]\w*$/', $identifier) !== 1) {
             throw new StorageException('Invalid table name: ' . $identifier);
         }
