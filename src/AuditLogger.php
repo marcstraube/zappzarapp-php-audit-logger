@@ -212,13 +212,14 @@ final readonly class AuditLogger implements AuditLoggerInterface
     public function verify(AuditLogResult $result): bool
     {
         try {
-            $dataJson = json_encode([
-                'meta' => [
-                    'user_agent' => $result->userAgent,
-                    'timestamp'  => $result->timestamp->format(self::TIMESTAMP_FORMAT),
-                ],
-                'data' => $result->data,
-            ], JSON_THROW_ON_ERROR);
+            $dataJson = json_encode(
+                $this->buildEnvelope(
+                    $result->userAgent,
+                    $result->timestamp->format(self::TIMESTAMP_FORMAT),
+                    $result->data,
+                ),
+                JSON_THROW_ON_ERROR,
+            );
         } catch (JsonException) {
             return false;
         }
@@ -249,18 +250,30 @@ final readonly class AuditLogger implements AuditLoggerInterface
     }
 
     /**
+     * @param array<string, mixed>|null $data
+     * @return array{meta: array{user_agent: string, timestamp: string}, data: array<string, mixed>|null}
+     */
+    private function buildEnvelope(string $userAgent, string $timestamp, ?array $data): array
+    {
+        return [
+            'meta' => [
+                'user_agent' => $userAgent,
+                'timestamp'  => $timestamp,
+            ],
+            'data' => $data,
+        ];
+    }
+
+    /**
      * @throws StorageException
      */
     private function encodeData(AuditLogEntry $entry, string $timestamp): string
     {
         try {
-            return json_encode([
-                'meta' => [
-                    'user_agent' => $entry->userAgent,
-                    'timestamp'  => $timestamp,
-                ],
-                'data' => $entry->data,
-            ], JSON_THROW_ON_ERROR);
+            return json_encode(
+                $this->buildEnvelope($entry->userAgent, $timestamp, $entry->data),
+                JSON_THROW_ON_ERROR,
+            );
         } catch (JsonException $jsonException) {
             throw new StorageException('Failed to encode audit data as JSON: ' . $jsonException->getMessage(), 0, $jsonException);
         }
