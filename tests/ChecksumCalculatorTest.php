@@ -362,6 +362,26 @@ final class ChecksumCalculatorTest extends TestCase
     }
 
     #[Test]
+    public function testVerifyReturnsFalseWhenDataErrorIsSet(): void
+    {
+        $result = new AuditLogResult(
+            id: 1,
+            timestamp: new DateTimeImmutable('2026-02-14 12:00:00'),
+            userId: 42,
+            ipAddress: '127.0.0.1',
+            userAgent: 'PHPUnit',
+            action: 'user.login',
+            entityType: 'auth',
+            entityId: '42',
+            data: null,
+            checksum: 'abc',
+            dataError: 'Corrupted JSON data: Syntax error',
+        );
+
+        $this->assertFalse($this->calculator->verify($result));
+    }
+
+    #[Test]
     public function testVerifyDetectsTamperedChecksum(): void
     {
         $this->createTestEntry();

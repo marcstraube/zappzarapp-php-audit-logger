@@ -65,6 +65,10 @@ final readonly class ChecksumCalculator
      */
     public function verify(AuditLogResult $result): bool
     {
+        if ($result->dataError !== null) {
+            return false;
+        }
+
         try {
             $dataJson = json_encode(
                 $this->buildEnvelope(
