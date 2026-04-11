@@ -385,4 +385,46 @@ final class FileLogReaderTest extends TestCase
         $decrypted     = $appEncryption->decrypt(trim($content), $this->encryptionKey);
         $this->assertJson($decrypted);
     }
+
+    #[Test]
+    public function testReadFileLogThrowsStorageExceptionWhenFileTooLarge(): void
+    {
+        // Create a file exceeding 10 MB
+        file_put_contents($this->tempLogFile, str_repeat('x', 10_485_761));
+
+        $reader = new FileLogReader(
+            fileEncryption: new AppEncryption(),
+            encryptionKey: $this->encryptionKey,
+            logFilePath: $this->tempLogFile,
+        );
+
+        $this->expectException(StorageException::class);
+        $this->expectExceptionMessage('File log exceeds maximum size of 10485760 bytes');
+
+        $reader->readFileLog();
+    }
+
+    /**
+     * Boundary test: file at exactly MAX_FILE_LOG_SIZE must be accepted (kills > to >= mutant).
+     */
+    #[Test]
+    public function testReadFileLogAcceptsFileAtExactMaxSize(): void
+    {
+        // Create file at exactly 10 MB
+        file_put_contents($this->tempLogFile, str_repeat('x', 10_485_760));
+
+        $reader = new FileLogReader(
+            fileEncryption: new AppEncryption(),
+            encryptionKey: $this->encryptionKey,
+            logFilePath: $this->tempLogFile,
+        );
+
+        // Size check passes — decryption will fail on garbage data, but that's expected
+        try {
+            $reader->readFileLog();
+        } catch (StorageException | EncryptionException $exception) {
+            // Must NOT be the size-limit error
+            $this->assertStringNotContainsString('exceeds maximum size', $exception->getMessage());
+        }
+    }
 }

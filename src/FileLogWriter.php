@@ -14,6 +14,8 @@ use Zappzarapp\AuditLogger\Exception\StorageException;
  */
 final readonly class FileLogWriter
 {
+    private const int MAX_FILE_LOG_SIZE = 10_485_760;
+
     public function __construct(
         private EncryptionInterface $fileEncryption,
         private string $encryptionKey,
@@ -31,6 +33,8 @@ final readonly class FileLogWriter
         if ($this->logFilePath === null) {
             return;
         }
+
+        $this->guardFileSize($this->logFilePath);
 
         $logDir = dirname($this->logFilePath);
         /** @infection-ignore-all: Permission value and mkdir failure path untestable without filesystem mocking */
@@ -68,6 +72,23 @@ final readonly class FileLogWriter
 
         if ($isNewFile) {
             chmod($this->logFilePath, 0600);
+        }
+    }
+
+    /**
+     * @throws StorageException
+     */
+    private function guardFileSize(string $filePath): void
+    {
+        if (!file_exists($filePath)) {
+            return;
+        }
+
+        $fileSize = filesize($filePath);
+        if ($fileSize !== false && $fileSize > self::MAX_FILE_LOG_SIZE) {
+            throw new StorageException(
+                'File log exceeds maximum size of ' . self::MAX_FILE_LOG_SIZE . ' bytes',
+            );
         }
     }
 }
