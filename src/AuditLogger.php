@@ -561,6 +561,10 @@ final readonly class AuditLogger implements AuditLoggerInterface
      */
     private function validateIdentifier(string $identifier): string
     {
+        if (strlen($identifier) > 64) {
+            throw new StorageException('Table name exceeds maximum length of 64 characters: ' . $identifier);
+        }
+
         if (preg_match('/^[a-zA-Z_]\w*$/', $identifier) !== 1) {
             throw new StorageException('Invalid table name: ' . $identifier);
         }
