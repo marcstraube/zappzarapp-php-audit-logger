@@ -34,10 +34,25 @@ deptrac:
         - type: classLike
           value: ^Zappzarapp\\AuditLogger\\AuditLoggerInterface$
 
+    - name: ResultMapper
+      collectors:
+        - type: classLike
+          value: ^Zappzarapp\\AuditLogger\\ResultMapper$
+
+    - name: ChecksumCalculator
+      collectors:
+        - type: classLike
+          value: ^Zappzarapp\\AuditLogger\\ChecksumCalculator$
+
     - name: FileLogReader
       collectors:
         - type: classLike
           value: ^Zappzarapp\\AuditLogger\\FileLogReader$
+
+    - name: FileLogWriter
+      collectors:
+        - type: classLike
+          value: ^Zappzarapp\\AuditLogger\\FileLogWriter$
 
     - name: CoreLogger
       collectors:
@@ -65,19 +80,39 @@ deptrac:
       - CoreDTO
       - Exception
 
-    # FileLogReader depends on Encryption, Exception, and CoreDTO
+    # ResultMapper depends on DTOs and Exception
+    ResultMapper:
+      - CoreDTO
+      - Exception
+
+    # ChecksumCalculator depends on DTOs and Exception
+    ChecksumCalculator:
+      - CoreDTO
+      - Exception
+
+    # FileLogReader depends on Encryption, Exception, CoreDTO, and ResultMapper
     FileLogReader:
       - Encryption
       - Exception
       - CoreDTO
+      - ResultMapper
 
-    # Logger depends on everything
+    # FileLogWriter depends on Encryption, Exception, and CoreDTO
+    FileLogWriter:
+      - Encryption
+      - Exception
+      - CoreDTO
+
+    # Logger depends on core components and extracted services
     CoreLogger:
       - CoreInterface
       - CoreDTO
       - Encryption
       - Exception
+      - ChecksumCalculator
+      - ResultMapper
       - FileLogReader
+      - FileLogWriter
 
     # NullLogger depends on Interface, DTOs, and Exception (transitively via Interface)
     CoreNullLogger:

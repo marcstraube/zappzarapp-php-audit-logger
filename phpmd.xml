@@ -75,8 +75,8 @@
     </rule>
     <rule ref="rulesets/design.xml/CouplingBetweenObjects">
         <properties>
-            <!-- AuditLogger coordinates encryption, storage, DTOs, FileLogReader, and exceptions -->
-            <property name="maximum" value="16"/>
+            <!-- AuditLogger coordinates encryption, storage, DTOs, and extracted services (SRP refactoring) -->
+            <property name="maximum" value="19"/>
         </properties>
     </rule>
 

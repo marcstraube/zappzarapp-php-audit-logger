@@ -29,21 +29,17 @@ final readonly class AuditLogger implements AuditLoggerInterface
 {
     private const string DB_HKDF_INFO = 'audit-logger-db-encryption';
 
-    private const string HMAC_HKDF_INFO = 'audit-logger-hmac';
-
-    private const string TIMESTAMP_FORMAT = 'Y-m-d H:i:s';
-
     private const int MAX_ENCODED_DATA_SIZE = 10_000;
 
     private bool $useDbEncryption;
 
-    private EncryptionInterface $fileEncryption;
+    private ChecksumCalculator $checksumCalculator;
+
+    private FileLogWriter $fileLogWriter;
 
     private FileLogReader $fileLogReader;
 
     private string $dbEncryptionKey;
-
-    private string $hmacKey;
 
     /**
      * @param PDO $pdo Database connection
@@ -61,7 +57,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
         private string $encryptionKey,
         private EncryptionInterface $encryption = new AppEncryption(),
         private string $tableName = 'audit_logs',
-        private ?string $logFilePath = null,
+        ?string $logFilePath = null,
         private ?int $maxLimit = null,
     ) {
         if (strlen($encryptionKey) < 32) {
@@ -74,13 +70,14 @@ final readonly class AuditLogger implements AuditLoggerInterface
 
         $this->validateIdentifier($tableName);
 
-        $this->useDbEncryption  = $encryption instanceof DatabaseEncryption;
-        $this->fileEncryption   = $this->useDbEncryption ? new AppEncryption() : $encryption;
-        $this->fileLogReader    = new FileLogReader($this->fileEncryption, $encryptionKey, $logFilePath);
-        $this->dbEncryptionKey  = $this->useDbEncryption
+        $this->useDbEncryption    = $encryption instanceof DatabaseEncryption;
+        $fileEncryption           = $this->useDbEncryption ? new AppEncryption() : $encryption;
+        $this->fileLogReader      = new FileLogReader($fileEncryption, $encryptionKey, $logFilePath);
+        $this->fileLogWriter      = new FileLogWriter($fileEncryption, $encryptionKey, $logFilePath);
+        $this->checksumCalculator = new ChecksumCalculator(ChecksumCalculator::deriveKey($encryptionKey));
+        $this->dbEncryptionKey    = $this->useDbEncryption
             ? hash_hkdf('sha256', $encryptionKey, 32, self::DB_HKDF_INFO)
             : '';
-        $this->hmacKey          = hash_hkdf('sha256', $encryptionKey, 32, self::HMAC_HKDF_INFO);
     }
 
     /**
@@ -88,8 +85,8 @@ final readonly class AuditLogger implements AuditLoggerInterface
      */
     public function log(AuditLogEntry $entry): void
     {
-        $timestamp = (new DateTimeImmutable())->format(self::TIMESTAMP_FORMAT);
-        $dataJson  = $this->encodeData($entry, $timestamp);
+        $timestamp = (new DateTimeImmutable())->format(ChecksumCalculator::TIMESTAMP_FORMAT);
+        $dataJson  = $this->checksumCalculator->encodeData($entry, $timestamp);
 
         if (strlen($dataJson) > self::MAX_ENCODED_DATA_SIZE) {
             throw new StorageException(
@@ -98,13 +95,13 @@ final readonly class AuditLogger implements AuditLoggerInterface
             );
         }
 
-        $checksum  = $this->calculateChecksum($timestamp, $entry, $dataJson);
+        $checksum = $this->checksumCalculator->calculate($timestamp, $entry, $dataJson);
 
         try {
             $this->writeToDatabase($timestamp, $entry, $dataJson, $checksum);
         } catch (PDOException $pdoException) {
             try {
-                $this->writeToFile($timestamp, $entry, $checksum);
+                $this->fileLogWriter->write($timestamp, $entry, $checksum);
             } catch (AuditLogException $fileException) {
                 throw new StorageException(
                     'Failed to write audit log to database AND file fallback: '
@@ -119,7 +116,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
         }
 
         try {
-            $this->writeToFile($timestamp, $entry, $checksum);
+            $this->fileLogWriter->write($timestamp, $entry, $checksum);
         } catch (AuditLogException) {
             // Silently ignore file write failures after successful database write.
             // The file log is a redundant fallback — the audit entry is already persisted.
@@ -210,34 +207,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
      */
     public function verify(AuditLogResult $result): bool
     {
-        try {
-            $dataJson = json_encode(
-                $this->buildEnvelope(
-                    $result->userAgent,
-                    $result->timestamp->format(self::TIMESTAMP_FORMAT),
-                    $result->data,
-                ),
-                JSON_THROW_ON_ERROR,
-            );
-        } catch (JsonException) {
-            return false;
-        }
-
-        $expected = hash_hmac(
-            'sha256',
-            $this->buildChecksumInput(
-                $result->timestamp->format(self::TIMESTAMP_FORMAT),
-                $result->userId,
-                $result->ipAddress,
-                $result->action,
-                $result->entityType,
-                $result->entityId,
-                $dataJson,
-            ),
-            $this->hmacKey,
-        );
-
-        return hash_equals($expected, $result->checksum);
+        return $this->checksumCalculator->verify($result);
     }
 
     /**
@@ -246,71 +216,6 @@ final readonly class AuditLogger implements AuditLoggerInterface
     public function readFileLog(): array
     {
         return $this->fileLogReader->readFileLog();
-    }
-
-    /**
-     * @param array<string, mixed>|null $data
-     * @return array{meta: array{user_agent: string, timestamp: string}, data: array<string, mixed>|null}
-     */
-    private function buildEnvelope(string $userAgent, string $timestamp, ?array $data): array
-    {
-        return [
-            'meta' => [
-                'user_agent' => $userAgent,
-                'timestamp'  => $timestamp,
-            ],
-            'data' => $data,
-        ];
-    }
-
-    /**
-     * @throws StorageException
-     */
-    private function encodeData(AuditLogEntry $entry, string $timestamp): string
-    {
-        try {
-            return json_encode(
-                $this->buildEnvelope($entry->userAgent, $timestamp, $entry->data),
-                JSON_THROW_ON_ERROR,
-            );
-        } catch (JsonException $jsonException) {
-            throw new StorageException('Failed to encode audit data as JSON: ' . $jsonException->getMessage(), 0, $jsonException);
-        }
-    }
-
-    private function calculateChecksum(string $timestamp, AuditLogEntry $entry, string $dataJson): string
-    {
-        return hash_hmac(
-            'sha256',
-            $this->buildChecksumInput(
-                $timestamp,
-                $entry->userId,
-                $entry->ipAddress,
-                $entry->action,
-                $entry->entityType,
-                (string) $entry->entityId,
-                $dataJson,
-            ),
-            $this->hmacKey,
-        );
-    }
-
-    private function buildChecksumInput(
-        string $timestamp,
-        ?int $userId,
-        string $ipAddress,
-        string $action,
-        string $entityType,
-        string $entityId,
-        string $dataJson,
-    ): string {
-        return $timestamp . "\0"
-            . ($userId ?? '') . "\0"
-            . $ipAddress . "\0"
-            . $action . "\0"
-            . $entityType . "\0"
-            . $entityId . "\0"
-            . $dataJson;
     }
 
     /**
@@ -358,54 +263,6 @@ final readonly class AuditLogger implements AuditLoggerInterface
         }
 
         $stmt->execute($params);
-    }
-
-    /**
-     * @throws EncryptionException
-     * @throws StorageException
-     */
-    private function writeToFile(string $timestamp, AuditLogEntry $entry, string $checksum): void
-    {
-        if ($this->logFilePath === null) {
-            return;
-        }
-
-        $logDir = dirname($this->logFilePath);
-        /** @infection-ignore-all: Permission value and mkdir failure path untestable without filesystem mocking */
-        if (!is_dir($logDir) && (!mkdir($logDir, 0700, true) && !is_dir($logDir))) {
-            throw new StorageException('Failed to create log directory: ' . $logDir);
-        }
-
-        try {
-            $logEntry = json_encode([
-                'timestamp'   => $timestamp,
-                'user_id'     => $entry->userId,
-                'ip_address'  => $entry->ipAddress,
-                'user_agent'  => $entry->userAgent,
-                'action'      => $entry->action,
-                'entity_type' => $entry->entityType,
-                'entity_id'   => (string) $entry->entityId,
-                'data'        => $entry->data,
-                'checksum'    => $checksum,
-            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        } catch (JsonException $jsonException) {
-            throw new StorageException('Failed to encode file log entry as JSON: ' . $jsonException->getMessage(), 0, $jsonException);
-        }
-
-        $encrypted = $this->fileEncryption->encrypt($logEntry, $this->encryptionKey);
-
-        /** @infection-ignore-all: Permission value and isNewFile check not meaningfully mutatable */
-        $isNewFile = !file_exists($this->logFilePath);
-
-        $result = file_put_contents($this->logFilePath, $encrypted . PHP_EOL, FILE_APPEND | LOCK_EX);
-
-        if ($result === false) {
-            throw new StorageException('Failed to write audit log to file: ' . $this->logFilePath);
-        }
-
-        if ($isNewFile) {
-            chmod($this->logFilePath, 0600);
-        }
     }
 
     /**

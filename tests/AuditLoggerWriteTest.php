@@ -6,14 +6,12 @@ namespace Zappzarapp\AuditLogger\Tests;
 
 use InvalidArgumentException;
 use JsonException;
-use org\bovigo\vfs\vfsStream;
 use PDO;
 use PDOException;
 use PDOStatement;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use ReflectionMethod;
 use Zappzarapp\AuditLogger\AuditLogEntry;
 use Zappzarapp\AuditLogger\AuditLogger;
 use Zappzarapp\AuditLogger\Encryption\AppEncryption;
@@ -916,46 +914,6 @@ final class AuditLoggerWriteTest extends TestCase
         $this->assertStringContainsString("\u{00E4}\u{00F6}\u{00FC}", $decrypted);
     }
 
-    /**
-     * Test writeToFile throws StorageException when JSON encoding of file log entry fails.
-     * Uses Reflection because encodeData() would fail first via log(), making this path unreachable.
-     *
-     * @noinspection PhpUnhandledExceptionInspection - ReflectionMethod on known private method
-     */
-    #[Test]
-    public function testWriteToFileThrowsStorageExceptionOnJsonEncodeFails(): void
-    {
-        $pdo = $this->createStub(PDO::class);
-
-        $logger = new AuditLogger(
-            pdo: $pdo,
-            encryptionKey: $this->encryptionKey,
-            encryption: new DatabaseEncryption(),
-            logFilePath: $this->tempLogFile,
-        );
-
-        $entry = new AuditLogEntry(
-            action: 'test.action',
-            entityType: 'test',
-            entityId: 1,
-            data: ['value' => NAN],
-        );
-
-        $method = new ReflectionMethod($logger, 'writeToFile');
-
-        try {
-            $method->invoke($logger, '2026-02-14 12:00:00', $entry, 'dummy-checksum');
-            $this->fail('Expected StorageException was not thrown');
-        } catch (StorageException $storageException) { // @phpstan-ignore catch.neverThrown (thrown inside Reflection invoke)
-            $this->assertStringStartsWith('Failed to encode file log entry as JSON: ', $storageException->getMessage());
-            $this->assertGreaterThan(
-                strlen('Failed to encode file log entry as JSON: '),
-                strlen($storageException->getMessage()),
-            );
-            $this->assertSame(0, $storageException->getCode());
-            $this->assertInstanceOf(JsonException::class, $storageException->getPrevious());
-        }
-    }
 
     #[Test]
     public function testLogThrowsStorageExceptionWhenDataExceedsMaxSize(): void
@@ -1106,74 +1064,4 @@ final class AuditLoggerWriteTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
-    #[Test]
-    public function testWriteToFileThrowsStorageExceptionOnMkdirFailure(): void
-    {
-        $root    = vfsStream::setup('root', 0000);
-        $logFile = $root->url() . '/subdir/audit.log';
-
-        $pdo = $this->createStub(PDO::class);
-
-        $logger = new AuditLogger(
-            pdo: $pdo,
-            encryptionKey: $this->encryptionKey,
-            encryption: new DatabaseEncryption(),
-            logFilePath: $logFile,
-        );
-
-        $entry  = new AuditLogEntry(
-            action: 'test.action',
-            entityType: 'test',
-            entityId: 1,
-        );
-
-        $method = new ReflectionMethod($logger, 'writeToFile');
-
-        try {
-            $method->invoke($logger, '2026-02-14 12:00:00', $entry, 'dummy-checksum');
-            $this->fail('Expected StorageException was not thrown');
-        } catch (StorageException $storageException) { // @phpstan-ignore catch.neverThrown (thrown inside Reflection invoke)
-            $this->assertStringStartsWith('Failed to create log directory: ', $storageException->getMessage());
-        }
-    }
-
-    #[Test]
-    public function testWriteToFileThrowsStorageExceptionOnWriteFailure(): void
-    {
-        $root = vfsStream::setup('root');
-        vfsStream::newDirectory('logs')->at($root);
-        $logFile = $root->url() . '/logs/audit.log';
-
-        // Quota 0 makes file_put_contents return false
-        vfsStream::setQuota(0);
-
-        $pdo = $this->createStub(PDO::class);
-
-        $logger = new AuditLogger(
-            pdo: $pdo,
-            encryptionKey: $this->encryptionKey,
-            encryption: new DatabaseEncryption(),
-            logFilePath: $logFile,
-        );
-
-        $entry  = new AuditLogEntry(
-            action: 'test.action',
-            entityType: 'test',
-            entityId: 1,
-        );
-
-        $method = new ReflectionMethod($logger, 'writeToFile');
-
-        // Suppress "Only 0 of N bytes written" PHP warning from file_put_contents
-        set_error_handler(static fn (): bool => true);
-        try {
-            $method->invoke($logger, '2026-02-14 12:00:00', $entry, 'dummy-checksum');
-            $this->fail('Expected StorageException was not thrown');
-        } catch (StorageException $storageException) { // @phpstan-ignore catch.neverThrown (thrown inside Reflection invoke)
-            $this->assertStringStartsWith('Failed to write audit log to file: ', $storageException->getMessage());
-            $this->assertStringContainsString($logFile, $storageException->getMessage());
-        } finally {
-            restore_error_handler();
-        }
-    }
 }
