@@ -113,6 +113,19 @@ $auditLogger = new NullAuditLogger();
 > }
 > ```
 
+> **Note:** The library does not set query timeouts on the injected PDO connection.
+> Configure timeouts at the connection level to prevent indefinite blocking:
+>
+> ```php
+> // PostgreSQL
+> $pdo->exec('SET statement_timeout = 5000'); // 5 seconds
+>
+> // MariaDB / MySQL
+> $pdo = new PDO($dsn, $user, $pass, [
+>     PDO::ATTR_TIMEOUT => 5,
+> ]);
+> ```
+
 ## Database Setup
 
 Apply the migration for your database:
