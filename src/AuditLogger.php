@@ -117,7 +117,12 @@ final readonly class AuditLogger implements AuditLoggerInterface
             throw new StorageException('Failed to write audit log to database: ' . $pdoException->getMessage(), 0, $pdoException);
         }
 
-        $this->writeToFile($timestamp, $entry, $checksum);
+        try {
+            $this->writeToFile($timestamp, $entry, $checksum);
+        } catch (AuditLogException) {
+            // Silently ignore file write failures after successful database write.
+            // The file log is a redundant fallback — the audit entry is already persisted.
+        }
     }
 
     /**
