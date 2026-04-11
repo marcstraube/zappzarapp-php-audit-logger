@@ -39,6 +39,7 @@ final class ResultMapper
     public static function map(array $row, string $errorContext, ?string $dataError = null): AuditLogResult
     {
         self::validateSchema($row, $errorContext);
+        self::validateTypes($row, $errorContext);
 
         return new AuditLogResult(
             id: (int) $row['id'],
@@ -66,6 +67,22 @@ final class ResultMapper
         $missingKeys = array_diff(self::REQUIRED_KEYS, array_keys($row));
         if ($missingKeys !== []) {
             throw new StorageException('Missing required fields in ' . $errorContext . ': ' . implode(', ', $missingKeys));
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     *
+     * @throws StorageException
+     */
+    private static function validateTypes(array $row, string $errorContext): void
+    {
+        if (!is_numeric($row['id'])) {
+            throw new StorageException('Invalid type for id in ' . $errorContext . ': expected numeric');
+        }
+
+        if ($row['user_id'] !== null && !is_numeric($row['user_id'])) {
+            throw new StorageException('Invalid type for user_id in ' . $errorContext . ': expected numeric or null');
         }
     }
 

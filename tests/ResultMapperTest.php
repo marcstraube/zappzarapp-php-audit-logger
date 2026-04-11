@@ -188,4 +188,50 @@ final class ResultMapperTest extends TestCase
             $this->assertStringContainsString('file log line 7', $storageException->getMessage());
         }
     }
+
+    #[Test]
+    public function testMapThrowsOnNonNumericId(): void
+    {
+        $row       = $this->validRow();
+        $row['id'] = 'not-a-number';
+
+        $this->expectException(StorageException::class);
+        $this->expectExceptionMessage('Invalid type for id in test context: expected numeric');
+
+        ResultMapper::map($row, 'test context');
+    }
+
+    #[Test]
+    public function testMapThrowsOnNonNumericUserId(): void
+    {
+        $row            = $this->validRow();
+        $row['user_id'] = 'not-a-number';
+
+        $this->expectException(StorageException::class);
+        $this->expectExceptionMessage('Invalid type for user_id in test context: expected numeric or null');
+
+        ResultMapper::map($row, 'test context');
+    }
+
+    #[Test]
+    public function testMapAcceptsStringNumericId(): void
+    {
+        $row       = $this->validRow();
+        $row['id'] = '42';
+
+        $result = ResultMapper::map($row, 'test context');
+
+        $this->assertSame(42, $result->id);
+    }
+
+    #[Test]
+    public function testMapAcceptsStringNumericUserId(): void
+    {
+        $row            = $this->validRow();
+        $row['user_id'] = '42';
+
+        $result = ResultMapper::map($row, 'test context');
+
+        $this->assertSame(42, $result->userId);
+    }
 }
