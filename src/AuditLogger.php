@@ -32,6 +32,8 @@ final readonly class AuditLogger implements AuditLoggerInterface
 
     private const string HMAC_HKDF_INFO = 'audit-logger-hmac';
 
+    private const string TIMESTAMP_FORMAT = 'Y-m-d H:i:s';
+
     private const int MAX_ENCODED_DATA_SIZE = 10_000;
 
     private bool $useDbEncryption;
@@ -87,7 +89,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
      */
     public function log(AuditLogEntry $entry): void
     {
-        $timestamp = (new DateTimeImmutable())->format('Y-m-d H:i:s');
+        $timestamp = (new DateTimeImmutable())->format(self::TIMESTAMP_FORMAT);
         $dataJson  = $this->encodeData($entry, $timestamp);
 
         if (strlen($dataJson) > self::MAX_ENCODED_DATA_SIZE) {
@@ -213,7 +215,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
             $dataJson = json_encode([
                 'meta' => [
                     'user_agent' => $result->userAgent,
-                    'timestamp'  => $result->timestamp->format('Y-m-d H:i:s'),
+                    'timestamp'  => $result->timestamp->format(self::TIMESTAMP_FORMAT),
                 ],
                 'data' => $result->data,
             ], JSON_THROW_ON_ERROR);
@@ -224,7 +226,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
         $expected = hash_hmac(
             'sha256',
             $this->buildChecksumInput(
-                $result->timestamp->format('Y-m-d H:i:s'),
+                $result->timestamp->format(self::TIMESTAMP_FORMAT),
                 $result->userId,
                 $result->ipAddress,
                 $result->action,
