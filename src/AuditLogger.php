@@ -73,7 +73,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
             throw new InvalidArgumentException('Max limit must be at least 1');
         }
 
-        $this->escapeIdentifier($tableName);
+        $this->validateIdentifier($tableName);
 
         $this->useDbEncryption  = $encryption instanceof DatabaseEncryption;
         $this->fileEncryption   = $this->useDbEncryption ? new AppEncryption() : $encryption;
@@ -325,7 +325,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
         string $dataJson,
         string $checksum,
     ): void {
-        $table = $this->escapeIdentifier($this->tableName);
+        $table = $this->validateIdentifier($this->tableName);
 
         if ($this->useDbEncryption) {
             $sql = "
@@ -427,7 +427,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
             throw new InvalidArgumentException('Limit must not exceed ' . $this->maxLimit);
         }
 
-        $table = $this->escapeIdentifier($this->tableName);
+        $table = $this->validateIdentifier($this->tableName);
 
         if ($this->useDbEncryption) {
             $sql = "
@@ -555,11 +555,11 @@ final readonly class AuditLogger implements AuditLoggerInterface
     }
 
     /**
-     * Escape a SQL identifier (table name) to prevent injection
+     * Validate a SQL identifier (table name) to prevent injection
      *
      * @throws StorageException
      */
-    private function escapeIdentifier(string $identifier): string
+    private function validateIdentifier(string $identifier): string
     {
         if (preg_match('/^[a-zA-Z_]\w*$/', $identifier) !== 1) {
             throw new StorageException('Invalid table name: ' . $identifier);
