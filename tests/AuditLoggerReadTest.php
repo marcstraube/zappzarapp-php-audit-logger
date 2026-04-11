@@ -314,7 +314,7 @@ final class AuditLoggerReadTest extends TestCase
         );
 
         $this->expectException(StorageException::class);
-        $this->expectExceptionMessage('Invalid timestamp in audit log');
+        $this->expectExceptionMessage('Invalid timestamp in audit log row');
 
         $logger->getLogsForEntity(entityType: 'test', entityId: 1);
     }
@@ -388,11 +388,11 @@ final class AuditLoggerReadTest extends TestCase
             $logger->getLogsForEntity(entityType: 'test', entityId: 1);
             $this->fail('Expected StorageException was not thrown');
         } catch (StorageException $storageException) {
-            $this->assertStringStartsWith('Invalid timestamp in audit log: ', $storageException->getMessage());
+            $this->assertStringStartsWith('Invalid timestamp in audit log row: ', $storageException->getMessage());
             $this->assertSame(0, $storageException->getCode());
             // The exception message should include the DateMalformedStringException message
             $this->assertGreaterThan(
-                strlen('Invalid timestamp in audit log: '),
+                strlen('Invalid timestamp in audit log row: '),
                 strlen($storageException->getMessage()),
             );
         }

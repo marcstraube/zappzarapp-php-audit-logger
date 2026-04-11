@@ -7,7 +7,6 @@ declare(strict_types=1);
 
 namespace Zappzarapp\AuditLogger;
 
-use DateMalformedStringException;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use JsonException;
@@ -468,20 +467,6 @@ final readonly class AuditLogger implements AuditLoggerInterface
             throw new StorageException('Failed to query audit logs: ' . $pdoException->getMessage(), 0, $pdoException);
         }
 
-        return $this->mapResults($rows);
-    }
-
-    /**
-     * Map raw database rows to AuditLogResult DTOs
-     *
-     * @param array<int, array<string, mixed>> $rows
-     * @return AuditLogResult[]
-     *
-     * @throws EncryptionException
-     * @throws StorageException
-     */
-    private function mapResults(array $rows): array
-    {
         return array_map($this->mapRow(...), $rows);
     }
 
@@ -493,11 +478,9 @@ final readonly class AuditLogger implements AuditLoggerInterface
      */
     private function mapRow(array $row): AuditLogResult
     {
-        $this->validateRowSchema($row);
-
         $dataString = $this->useDbEncryption
             ? ($row['data_decrypted'] ?? null)
-            : ($row['data'] !== null ? $this->encryption->decrypt((string) $row['data'], $this->encryptionKey) : null);
+            : (($row['data'] ?? null) !== null ? $this->encryption->decrypt((string) $row['data'], $this->encryptionKey) : null);
 
         $data      = null;
         $dataError = null;
@@ -517,41 +500,10 @@ final readonly class AuditLogger implements AuditLoggerInterface
             }
         }
 
-        try {
-            $timestamp = new DateTimeImmutable((string) $row['timestamp']);
-        } catch (DateMalformedStringException $dateMalformedStringException) {
-            throw new StorageException('Invalid timestamp in audit log: ' . $dateMalformedStringException->getMessage(), 0, $dateMalformedStringException);
-        }
+        $row['user_agent'] = $userAgent;
+        $row['data']       = $data;
 
-        return new AuditLogResult(
-            id: (int) $row['id'],
-            timestamp: $timestamp,
-            userId: $row['user_id'] !== null ? (int) $row['user_id'] : null,
-            ipAddress: (string) $row['ip_address'],
-            userAgent: $userAgent,
-            action: (string) $row['action'],
-            entityType: (string) $row['entity_type'],
-            entityId: (string) $row['entity_id'],
-            data: $data,
-            checksum: (string) $row['checksum'],
-            dataError: $dataError,
-        );
-    }
-
-    /**
-     * Validate that a database row contains all required fields
-     *
-     * @param array<string, mixed> $row
-     *
-     * @throws StorageException
-     */
-    private function validateRowSchema(array $row): void
-    {
-        $requiredKeys = ['id', 'timestamp', 'user_id', 'ip_address', 'action', 'entity_type', 'entity_id', 'checksum'];
-        $missingKeys  = array_diff($requiredKeys, array_keys($row));
-        if ($missingKeys !== []) {
-            throw new StorageException('Missing required fields in audit log row: ' . implode(', ', $missingKeys));
-        }
+        return ResultMapper::map($row, 'audit log row', $dataError);
     }
 
     /**

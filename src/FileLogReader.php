@@ -6,8 +6,6 @@ declare(strict_types=1);
 
 namespace Zappzarapp\AuditLogger;
 
-use DateMalformedStringException;
-use DateTimeImmutable;
 use JsonException;
 use Zappzarapp\AuditLogger\Encryption\EncryptionInterface;
 use Zappzarapp\AuditLogger\Exception\EncryptionException;
@@ -79,34 +77,8 @@ final readonly class FileLogReader
             throw new StorageException('Corrupted JSON in file log line ' . $lineNumber . ': expected object');
         }
 
-        $requiredKeys = ['timestamp', 'user_id', 'ip_address', 'user_agent', 'action', 'entity_type', 'entity_id', 'checksum'];
-        $missingKeys  = array_diff($requiredKeys, array_keys($row));
-        if ($missingKeys !== []) {
-            throw new StorageException('Missing required fields in file log line ' . $lineNumber . ': ' . implode(', ', $missingKeys));
-        }
+        $row['id'] = $lineNumber;
 
-        try {
-            $timestamp = new DateTimeImmutable((string) $row['timestamp']);
-        } catch (DateMalformedStringException $dateMalformedStringException) {
-            throw new StorageException(
-                'Invalid timestamp in file log line ' . $lineNumber . ': ' . $dateMalformedStringException->getMessage(),
-                0,
-                $dateMalformedStringException,
-            );
-        }
-
-        return new AuditLogResult(
-            id: $lineNumber,
-            timestamp: $timestamp,
-            /** @infection-ignore-all: CastInt is defensive — json_decode already returns int for JSON integers */
-            userId: $row['user_id'] !== null ? (int) $row['user_id'] : null,
-            ipAddress: (string) $row['ip_address'],
-            userAgent: (string) $row['user_agent'],
-            action: (string) $row['action'],
-            entityType: (string) $row['entity_type'],
-            entityId: (string) $row['entity_id'],
-            data: is_array($row['data'] ?? null) ? $row['data'] : null,
-            checksum: (string) $row['checksum'],
-        );
+        return ResultMapper::map($row, 'file log line ' . $lineNumber);
     }
 }
