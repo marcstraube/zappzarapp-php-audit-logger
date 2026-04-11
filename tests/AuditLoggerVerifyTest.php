@@ -398,6 +398,32 @@ final class AuditLoggerVerifyTest extends TestCase
     }
 
     #[Test]
+    public function testVerifyReturnsFalseWhenDataErrorIsSet(): void
+    {
+        $pdo    = $this->createStub(PDO::class);
+        $logger = new AuditLogger(
+            pdo: $pdo,
+            encryptionKey: $this->encryptionKey,
+        );
+
+        $result = new AuditLogResult(
+            id: 1,
+            timestamp: new DateTimeImmutable(),
+            userId: 1,
+            ipAddress: '127.0.0.1',
+            userAgent: 'unknown',
+            action: 'test',
+            entityType: 'test',
+            entityId: '1',
+            data: null,
+            checksum: 'abc',
+            dataError: 'Corrupted JSON data: Syntax error',
+        );
+
+        $this->assertFalse($logger->verify($result));
+    }
+
+    #[Test]
     public function testVerifyReturnsFalseWhenJsonEncodeFails(): void
     {
         $pdo    = $this->createStub(PDO::class);

@@ -65,6 +65,11 @@ final readonly class ChecksumCalculator
      */
     public function verify(AuditLogResult $result): bool
     {
+        if ($result->dataError !== null) {
+            /** @infection-ignore-all: ReturnRemoval — removing return still yields false (HMAC mismatch), early-return is an optimisation */
+            return false;
+        }
+
         try {
             $dataJson = json_encode(
                 $this->buildEnvelope(

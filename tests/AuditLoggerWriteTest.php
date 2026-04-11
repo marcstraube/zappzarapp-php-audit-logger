@@ -364,7 +364,8 @@ final class AuditLoggerWriteTest extends TestCase
                 $decoded  = json_decode($dataJson, true);
                 return is_array($decoded)
                     && is_array($decoded['data'] ?? null)
-                    && ($decoded['data']['admin_user_id'] ?? null) === 99;
+                    && ($decoded['data']['admin_user_id'] ?? null) === 99
+                    && ($decoded['data']['reason'] ?? null) === 'violation';
             }))
             ->willReturn(true);
 

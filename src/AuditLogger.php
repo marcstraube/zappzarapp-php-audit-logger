@@ -156,7 +156,6 @@ final readonly class AuditLogger implements AuditLoggerInterface
         string $ipAddress = 'unknown',
         string $userAgent = 'unknown',
     ): void {
-        $data['admin_user_id'] = $adminUserId;
         $this->log(new AuditLogEntry(
             action: $action,
             entityType: $entityType,
@@ -164,7 +163,7 @@ final readonly class AuditLogger implements AuditLoggerInterface
             userId: $adminUserId,
             ipAddress: $ipAddress,
             userAgent: $userAgent,
-            data: $data,
+            data: [...$data, 'admin_user_id' => $adminUserId],
         ));
     }
 
