@@ -125,7 +125,7 @@ final class AuditLogResultTest extends TestCase
         $this->expectException(Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property');
 
-        // @phpstan-ignore property.readOnlyAssignOutOfClass
+        // @phpstan-ignore property.readOnlyAssignOutOfClass, assign.propertyProtectedSet
         $result->action = 'modified.action';
     }
 
