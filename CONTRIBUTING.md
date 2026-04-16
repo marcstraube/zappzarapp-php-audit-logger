@@ -8,7 +8,21 @@ Thank you for your interest in contributing!
 git clone git@github.com:marcstraube/zappzarapp-php-audit-logger.git
 cd zappzarapp-php-audit-logger
 make install
+make hooks
 ```
+
+## Git Hooks (Captainhook)
+
+Git hooks are managed via
+[Captainhook](https://captainhookphp.github.io/captainhook/).
+
+| Hook           | Actions                                            |
+| -------------- | -------------------------------------------------- |
+| `commit-msg`   | Validate Conventional Commits format               |
+| `pre-commit`   | Block secrets, PHP syntax check, CS-Fixer auto-fix |
+| `pre-push`     | Run all quality checks (`make check`)              |
+
+Hooks are configured in `captainhook.json`.
 
 ## Running Tests
 

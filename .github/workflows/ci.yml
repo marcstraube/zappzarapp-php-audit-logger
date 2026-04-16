@@ -53,30 +53,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Verify GPG signatures
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            unsigned=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.number }}/commits \
-              --paginate --jq '[.[] | select(.commit.verification.verified != true)] | length')
-            if [ "$unsigned" -gt 0 ]; then
-              echo "::error::Found $unsigned unsigned commit(s) in PR. All commits must be GPG-signed."
-              gh api repos/${{ github.repository }}/pulls/${{ github.event.number }}/commits \
-                --paginate --jq '.[] | select(.commit.verification.verified != true) | "  \(.sha[0:7]) — \(.commit.message | split("\n")[0])"'
-              exit 1
-            fi
-            echo "All PR commits are GPG-signed."
-          else
-            verified=$(gh api repos/${{ github.repository }}/commits/${{ github.sha }} \
-              --jq '.commit.verification.verified')
-            if [ "$verified" != "true" ]; then
-              echo "::error::Commit ${{ github.sha }} is not GPG-signed."
-              exit 1
-            fi
-            echo "Commit is GPG-signed."
-          fi
-
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:

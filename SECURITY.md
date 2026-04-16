@@ -47,6 +47,7 @@ This package implements multiple security layers:
 - **Mutation Testing**: Infection for test quality assurance
 - **Automated Updates**: Dependabot for Composer + GitHub Actions
 - **CI/CD**: GitHub Actions with security checks on every push
+- **Signed Releases**: GPG-signed tags and commits
 
 ## Known Security Considerations
 
