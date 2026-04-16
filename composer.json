@@ -82,7 +82,20 @@
     "psalm": "@php vendor/bin/psalm --show-info=false",
     "psalm-taint": "@php vendor/bin/psalm --taint-analysis",
     "security": "composer audit --no-dev",
-    "check": ["@security", "@cs-check", "@analyse", "@psalm", "@phpmd", "@rector", "@deptrac", "@test"],
-    "check-full": ["@check", "@infection", "@psalm-taint"]
+    "check": [
+      "@security",
+      "@cs-check",
+      "@analyse",
+      "@psalm",
+      "@phpmd",
+      "@rector",
+      "@deptrac",
+      "@test"
+    ],
+    "check-full": [
+      "@check",
+      "@infection",
+      "@psalm-taint"
+    ]
   }
 }
