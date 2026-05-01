@@ -1,5 +1,11 @@
 # zappzarapp/audit-logger
 
+[![Latest Version](https://img.shields.io/packagist/v/zappzarapp/audit-logger.svg)](https://packagist.org/packages/zappzarapp/audit-logger)
+[![PHP Version](https://img.shields.io/packagist/php-v/zappzarapp/audit-logger.svg)](https://packagist.org/packages/zappzarapp/audit-logger)
+[![License](https://img.shields.io/packagist/l/zappzarapp/audit-logger.svg)](https://packagist.org/packages/zappzarapp/audit-logger)
+[![CI](https://github.com/marcstraube/zappzarapp-php-audit-logger/actions/workflows/ci.yml/badge.svg)](https://github.com/marcstraube/zappzarapp-php-audit-logger/actions/workflows/ci.yml)
+[![Socket Badge](https://badge.socket.dev/composer/package/zappzarapp/audit-logger)](https://socket.dev/composer/package/zappzarapp/audit-logger)
+
 GDPR-compliant audit logging for PHP with injectable encryption, configurable
 storage, and tamper-proof checksums.
 
