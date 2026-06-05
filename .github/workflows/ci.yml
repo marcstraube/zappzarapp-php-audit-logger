@@ -55,18 +55,11 @@ jobs:
           extensions: openssl, pdo
           tools: composer:v2
 
-      # Audits only runtime (non-dev) dependencies, mirroring the Node repo's
-      # `pnpm audit --prod`. This library ships no runtime Composer deps, so the
-      # set is empty today; `composer audit --no-dev` errors on an empty set
-      # ("No installed packages found"), hence the guard makes an empty set pass
-      # green like pnpm does. The audit runs automatically once runtime deps exist.
+      # Runs scripts/security-audit.sh via composer, the single source of truth
+      # shared with the local `composer security` / `composer check`. See that
+      # script for why an empty non-dev set must be guarded.
       - name: Security audit (runtime dependencies)
-        run: |
-          if [ -n "$(composer show --locked --no-dev 2>/dev/null)" ]; then
-            composer audit --locked --no-dev
-          else
-            echo "No runtime dependencies to audit."
-          fi
+        run: composer security
 
   tests:
     name: PHP ${{ matrix.php }} Tests
