@@ -81,7 +81,7 @@
     "cs-check": "@php vendor/bin/php-cs-fixer fix --dry-run --diff",
     "psalm": "@php vendor/bin/psalm --show-info=false",
     "psalm-taint": "@php vendor/bin/psalm --taint-analysis",
-    "security": "composer audit --no-dev",
+    "security": "bash scripts/security-audit.sh",
     "check": [
       "@security",
       "@cs-check",
