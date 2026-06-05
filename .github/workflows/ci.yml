@@ -41,6 +41,33 @@ jobs:
       - name: Run Psalm Taint Analysis
         run: vendor/bin/psalm --taint-analysis
 
+  security:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: openssl, pdo
+          tools: composer:v2
+
+      # Audits only runtime (non-dev) dependencies, mirroring the Node repo's
+      # `pnpm audit --prod`. This library ships no runtime Composer deps, so the
+      # set is empty today; `composer audit --no-dev` errors on an empty set
+      # ("No installed packages found"), hence the guard makes an empty set pass
+      # green like pnpm does. The audit runs automatically once runtime deps exist.
+      - name: Security audit (runtime dependencies)
+        run: |
+          if [ -n "$(composer show --locked --no-dev 2>/dev/null)" ]; then
+            composer audit --locked --no-dev
+          else
+            echo "No runtime dependencies to audit."
+          fi
+
   tests:
     name: PHP ${{ matrix.php }} Tests
     runs-on: ubuntu-latest
@@ -74,9 +101,6 @@ jobs:
 
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
-
-      - name: Security audit
-        run: composer audit --no-dev
 
       - name: Check code style
         run: vendor/bin/php-cs-fixer fix --dry-run --diff
