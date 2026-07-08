@@ -64,7 +64,6 @@ final class NullAuditLoggerTest extends TestCase
         // Should not throw exception
         $this->logger->logAuth(
             action: 'auth.failed',
-            userId: null,
             data: ['reason' => 'invalid_password'],
             ipAddress: '127.0.0.1',
             userAgent: 'PHPUnit'

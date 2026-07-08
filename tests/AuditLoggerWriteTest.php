@@ -306,8 +306,7 @@ final class AuditLoggerWriteTest extends TestCase
         $logger = new AuditLogger(
             pdo: $pdo,
             encryptionKey: $this->encryptionKey,
-            encryption: new DatabaseEncryption(),
-            logFilePath: null, // No file logging
+            encryption: new DatabaseEncryption(), // No file logging
         );
 
         $entry = new AuditLogEntry(
@@ -1016,7 +1015,6 @@ final class AuditLoggerWriteTest extends TestCase
         new AuditLogger(
             pdo: $pdo,
             encryptionKey: $this->encryptionKey,
-            maxLimit: null,
         );
 
         $this->addToAssertionCount(1);
