@@ -1093,7 +1093,6 @@ final class AuditLoggerReadTest extends TestCase
             pdo: $pdo,
             encryptionKey: $this->encryptionKey,
             encryption: new DatabaseEncryption(),
-            maxLimit: null,
         );
 
         $logger->getLogsForEntity(entityType: 'user', entityId: 1, limit: 10_000);

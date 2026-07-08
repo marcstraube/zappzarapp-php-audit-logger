@@ -547,7 +547,6 @@ final class AuditLoggerVerifyTest extends TestCase
             action: 'system.cleanup',
             entityType: 'system',
             entityId: '1',
-            userId: null,
             ipAddress: '10.0.0.1',
             userAgent: 'Cron/1.0',
             data: ['task' => 'cleanup'],
